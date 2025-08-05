@@ -8,5 +8,6 @@
   "background_spacing": 40,
   "max_mountains": 8,
   "mountains_min_width": 60,
-  "mountains_max_width": 150
+  "mountains_max_width": 150,
+  "debug": false
 }
