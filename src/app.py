@@ -26,33 +26,33 @@ class Game:
         self.fps = _config.get("fps", 60)
         self.background_spacing = _config.get("background_spacing", 40)
         self.max_mountains = _config.get("max_mountains", 8)
+        self.mountains_min_width = _config.get("mountains_min_width", 60)
+        self.mountains_max_width = _config.get("mountains_max_width", 150)
 
     def _generate_mountains(self):
-        max_height = self.horizon_line // 3
-        min_width = 60
-        max_width = 150
+        max_height = int(self.horizon_line * 0.66)
+        min_width = self.mountains_min_width
+        max_width = self.mountains_max_width
 
         mountains = []
         x = 0
         count = 0
 
         while count < self.max_mountains and x < self.width:
-            # Espacio opcional antes de la montaña
-            x += random.randint(10, 40)
+            x += random.randint(0, 20) #espacio blanco antes de montaña
 
-            # Ancho aleatorio de la montaña
             width = random.randint(min_width, max_width)
             if x + width > self.width:
-                break  # No cabe, salimos
+                break
 
             peak_x = x + width // 2
             peak_y = self.horizon_line - random.randint(20, max_height)
 
-            mountains.append((x, self.horizon_line))              # base izquierda
+            mountains.append((x, self.horizon_line))           # base izquierda
             mountains.append((peak_x, peak_y))                 # pico
-            mountains.append((x + width, self.horizon_line))      # base derecha
+            mountains.append((x + width, self.horizon_line))   # base derecha
 
-            x += width + random.randint(10, 30)  # espacio después
+            x += width + random.randint(0, 20)  #espacio blanco despues de montaña
             count += 1
 
         return mountains
