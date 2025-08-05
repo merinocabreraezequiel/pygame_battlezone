@@ -61,41 +61,62 @@ class Game:
     def _world_to_player_view(self, x, y):
         dx = x - self.pos[0]
         dy = y - self.pos[1]
-        rad = math.radians(-self.angle)
-        view_x = dx * math.cos(rad) - dy * math.sin(rad)
-        view_y = dx * math.sin(rad) + dy * math.cos(rad)
+        rad = math.radians(self.angle)
+
+        view_x = dx * math.cos(rad) + dy * math.sin(rad)
+        view_y = -dx * math.sin(rad) + dy * math.cos(rad)
         return view_x, view_y
 
     def _project_point(self, x, y):
         if y <= 1:
             return None
-        scale = 300 / y
+
+        scale = 300 / y  # cuanto más lejos, más pequeño
         screen_x = int(self.width / 2 + x * scale)
-        screen_y = int(self.horizon_line + scale * -1)
+        screen_y = int(self.horizon_line + scale * 50)  # solo dibuja debajo del horizonte
+
         if 0 <= screen_x < self.width and 0 <= screen_y < self.height:
             return screen_x, screen_y
         return None
 
+
+
     def draw_ground(self):
-        spacing = self.background_spacing
-        ground_lines = []
+        line_count = 50  # número de líneas horizontales del suelo
+        col_spacing = 40  # espacio entre líneas verticales en el mundo
+        max_depth = 1000  # distancia máxima del suelo en Y
+        near = 1  # mínima distancia para evitar división por cero
 
-        for x in range(-1000, 1000, spacing):
-            for y in range(0, 1000, spacing):
-                # Posición en el mundo
-                world_start = (x, y)
-                world_end = (x + spacing, y)
+        # Dibujar líneas horizontales (van de izquierda a derecha, a distintas profundidades)
+        for i in range(line_count):
+            # interpolar distancia entre jugador y fondo
+            y = near + i * (max_depth / line_count)
 
-                # Transformar al sistema de coordenadas del jugador
-                start = self._world_to_player_view(*world_start)
-                end = self._world_to_player_view(*world_end)
+            # extremos izquierdo y derecho en coordenadas del mundo
+            x1_world = -1000
+            x2_world = 1000
 
-                # Proyección simple (sin 3D real)
-                screen_start = self._project_point(*start)
-                screen_end = self._project_point(*end)
+            # transformar y proyectar
+            p1 = self._world_to_player_view(x1_world, y)
+            p2 = self._world_to_player_view(x2_world, y)
 
-                if screen_start and screen_end:
-                    pygame.draw.line(self.screen, self.line_color, screen_start, screen_end, 1)
+            s1 = self._project_point(*p1)
+            s2 = self._project_point(*p2)
+
+            if s1 and s2:
+                pygame.draw.line(self.screen, self.line_color, s1, s2, 1)
+
+        # Dibujar líneas verticales (a lo largo del eje Z, desde cerca hasta el fondo)
+        for x in range(-400, 401, col_spacing):
+            start_world = self._world_to_player_view(x, near)
+            end_world = self._world_to_player_view(x, max_depth)
+
+            s_start = self._project_point(*start_world)
+            s_end = self._project_point(*end_world)
+
+            if s_start and s_end:
+                pygame.draw.line(self.screen, self.line_color, s_start, s_end, 1)
+
 
     def draw_mountains(self):
         for base1, peak, base2, height in self.mountains:
@@ -127,13 +148,13 @@ class Game:
             if self.debug: print(f"Turning left: {self.angle} degrees")
         if keys[pygame.K_w]:
             rad = math.radians(self.angle)
-            self.pos[0] += math.cos(rad) * self.speed
-            self.pos[1] += math.sin(rad) * self.speed
+            self.pos[0] += math.sin(rad) * self.speed
+            self.pos[1] += math.cos(rad) * self.speed
             if self.debug: print(f"Moving forward: {self.pos[0]}, {self.pos[1]}")
         if keys[pygame.K_s]:
             rad = math.radians(self.angle)
-            self.pos[0] -= math.cos(rad) * self.speed
-            self.pos[1] -= math.sin(rad) * self.speed
+            self.pos[0] -= math.sin(rad) * self.speed
+            self.pos[1] -= math.cos(rad) * self.speed
             if self.debug: print(f"Moving backward: {self.pos[0]}, {self.pos[1]}")
 
 
