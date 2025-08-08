@@ -68,83 +68,67 @@ class Game:
         return view_x, view_y
 
     def _project_point(self, x, y):
-        if y <= 1:
+        if y <= 0.1:
             return None
 
-        scale = 300 / y  # cuanto más lejos, más pequeño
+        scale = 300 / y  # Cuanto más cerca (y pequeño), mayor escala
         screen_x = int(self.width / 2 + x * scale)
-        screen_y = int(self.horizon_line + scale * 50)  # solo dibuja debajo del horizonte
+        screen_y = int(self.horizon_line - scale * 1.5)  # Aquí usamos la escala para "elevar" el punto
 
         if 0 <= screen_x < self.width and 0 <= screen_y < self.height:
             return screen_x, screen_y
         return None
 
-
-
     def draw_ground(self):
-        line_count = 50  # número de líneas horizontales del suelo
-        col_spacing = 40  # espacio entre líneas verticales en el mundo
-        max_depth = 1000  # distancia máxima del suelo en Y
-        near = 1  # mínima distancia para evitar división por cero
+        num_lines = 60  # número de líneas horizontales
+        horizon_y = self.horizon_line
+        bottom_y = self.height
 
-        # Dibujar líneas horizontales (van de izquierda a derecha, a distintas profundidades)
-        for i in range(line_count):
-            # interpolar distancia entre jugador y fondo
-            y = near + i * (max_depth / line_count)
+        # Líneas horizontales en perspectiva
+        for i in range(1, num_lines):
+            t = i / num_lines
+            y = int(horizon_y + (bottom_y - horizon_y) * t * t)  # cuadrática para más compresión arriba
+            pygame.draw.line(self.screen, self.line_color, (0, y), (self.width, y), 1)
 
-            # extremos izquierdo y derecho en coordenadas del mundo
-            x1_world = -1000
-            x2_world = 1000
-
-            # transformar y proyectar
-            p1 = self._world_to_player_view(x1_world, y)
-            p2 = self._world_to_player_view(x2_world, y)
-
-            s1 = self._project_point(*p1)
-            s2 = self._project_point(*p2)
-
-            if s1 and s2:
-                pygame.draw.line(self.screen, self.line_color, s1, s2, 1)
-
-        # Dibujar líneas verticales (a lo largo del eje Z, desde cerca hasta el fondo)
-        for x in range(-400, 401, col_spacing):
-            start_world = self._world_to_player_view(x, near)
-            end_world = self._world_to_player_view(x, max_depth)
-
-            s_start = self._project_point(*start_world)
-            s_end = self._project_point(*end_world)
-
-            if s_start and s_end:
-                pygame.draw.line(self.screen, self.line_color, s_start, s_end, 1)
-
+        # Líneas verticales que convergen al centro (punto de fuga)
+        center_x = self.width // 2
+        step = 40
+        for x in range(0, self.width, step):
+            pygame.draw.line(self.screen, self.line_color, (x, self.height), (center_x, horizon_y), 1)
 
     def draw_mountains(self):
-        for base1, peak, base2, height in self.mountains:
-            # Transformar las 3 posiciones al sistema del jugador
-            p1 = self._world_to_player_view(*base1)
+        for base_left, peak, base_right, visual_height in self.mountains:
+            # Transformar al espacio del jugador
+            p1 = self._world_to_player_view(*base_left)
             p2 = self._world_to_player_view(*peak)
-            p3 = self._world_to_player_view(*base2)
+            p3 = self._world_to_player_view(*base_right)
 
-            # Proyectar en pantalla
+            # Proyectar base izquierda y derecha
             s1 = self._project_point(*p1)
-            s2 = self._project_point(*p2)
             s3 = self._project_point(*p3)
 
+            # Proyectar el pico con su altura visual
+            # ↓↓↓ Aquí está la clave: restamos altura proporcional a la profundidad
+            peak_proj = self._project_point(p2[0], p2[1])
+            if peak_proj:
+                screen_peak_x, screen_peak_y = peak_proj
+                screen_peak_y -= int(visual_height * (300 / p2[1]))  # altura en perspectiva
+                s2 = (screen_peak_x, screen_peak_y)
+            else:
+                s2 = None
+
+            # Dibujar si todo está dentro de la pantalla
             if s1 and s2 and s3:
-                # Elevar el pico restando la altura (en píxeles)
-                s2 = (s2[0], s2[1] - height)
                 pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3], 1)
-                if self.debug:
-                    print(f"Mountain world coords: {p1}, {p2}, {p3}")
-                    print(f"Screen coords: {s1}, {s2}, {s3}")
+
 
     def update(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            self.angle -= self.turn_speed
+            self.angle += self.turn_speed
             if self.debug: print(f"Turning left: {self.angle} degrees")
         if keys[pygame.K_d]:
-            self.angle += self.turn_speed
+            self.angle -= self.turn_speed
             if self.debug: print(f"Turning left: {self.angle} degrees")
         if keys[pygame.K_w]:
             rad = math.radians(self.angle)
