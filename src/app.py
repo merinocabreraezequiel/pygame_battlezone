@@ -119,7 +119,8 @@ class Game:
 
             # Dibujar si todo está dentro de la pantalla
             if s1 and s2 and s3:
-                pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3], 1)
+                #pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3], 1) # El uno del final indica el grosor del contorno, si no tiene, es solido
+                pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3]) # Sin grosor para ser solido
 
 
     def update(self):
