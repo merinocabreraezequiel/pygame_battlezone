@@ -39,24 +39,30 @@ class Game:
 
     def _generate_mountains(self):
         mountains = []
+        radius_min = 100
+        radius_max = 1000
+
         for _ in range(self.max_mountains):
-            depth = random.randint(100, 600)  # distancia hacia adelante (eje Y)
+            angle_deg = random.uniform(0, 360)
+            angle_rad = math.radians(angle_deg)
+
+            dist = random.randint(radius_min, radius_max)
+
+            base_x = math.cos(angle_rad) * dist
+            base_y = math.sin(angle_rad) * dist
+
             width = random.randint(self.mountains_min_width, self.mountains_max_width)
-            height = random.randint(40, int(self.horizon_line * 0.33))  # altura real visual
+            height = random.randint(40, int(self.horizon_line * 0.33))
 
-            x = random.randint(-500, 500)
-            peak_x = x + width // 2
+            peak_x = base_x + width / 2
+            peak_y = base_y
 
-            # OJO: aquí la altura se representa con coordenadas más ALTAS en pantalla (menor Y)
-            base_y = depth
-            peak_y = depth  # misma profundidad que la base, pero se elevará visualmente
+            right_x = base_x + width
+            right_y = base_y
 
-            # Guardamos altura visual por separado
-            mountains.append(((x, base_y), (peak_x, peak_y), (x + width, base_y), height))
+            mountains.append(((base_x, base_y), (peak_x, peak_y), (right_x, right_y), height))
 
         return mountains
-
-
 
     def _world_to_player_view(self, x, y):
         dx = x - self.pos[0]
