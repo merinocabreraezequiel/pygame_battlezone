@@ -16,6 +16,7 @@ class Game:
         self.running = True
 
         self.horizon_line = self.height // 2
+        self.center_x = self.width // 2
         self.mountains = self._generate_mountains()
 
         #Inicialización del jugador
@@ -44,34 +45,52 @@ class Game:
 
         for _ in range(self.max_mountains):
             angle_deg = random.uniform(0, 360)
-            angle_rad = math.radians(angle_deg)
+            a = math.radians(angle_deg)
+
+            # Convención: forward = (sin(a), cos(a)) -> 0° apunta a +Y
+            forward_x = math.sin(a)
+            forward_y = math.cos(a)
 
             dist = random.randint(radius_min, radius_max)
+            # centro de la montaña en coordenadas mundo
+            center_x = forward_x * dist
+            center_y = forward_y * dist
 
-            base_x = math.cos(angle_rad) * dist
-            base_y = math.sin(angle_rad) * dist
+            # vector perpendicular (derecha) para el ancho
+            # para 0° -> right = (1, 0)
+            right_x = math.cos(a)
+            right_y = -math.sin(a)
 
             width = random.randint(self.mountains_min_width, self.mountains_max_width)
+            half_w = width / 2.0
+
+            # puntos del triángulo en mundo: base izquierda, pico (centro), base derecha
+            base_left = (center_x - right_x * half_w, center_y - right_y * half_w)
+            peak = (center_x, center_y)  # mantendremos la profundidad del pico igual al centro
+            base_right = (center_x + right_x * half_w, center_y + right_y * half_w)
+
             height = random.randint(40, int(self.horizon_line * 0.33))
 
-            peak_x = base_x + width / 2
-            peak_y = base_y
-
-            right_x = base_x + width
-            right_y = base_y
-
-            mountains.append(((base_x, base_y), (peak_x, peak_y), (right_x, right_y), height))
+            mountains.append((base_left, peak, base_right, height))
 
         return mountains
 
     def _world_to_player_view(self, x, y):
         dx = x - self.pos[0]
         dy = y - self.pos[1]
-        rad = math.radians(self.angle)
 
-        view_x = dx * math.cos(rad) + dy * math.sin(rad)
-        view_y = -dx * math.sin(rad) + dy * math.cos(rad)
+        # Mismo sistema de referencia que en update()
+        rad = math.radians(self.angle)
+        cos_a = math.cos(rad)
+        sin_a = math.sin(rad)
+
+        # Rotación inversa (pasar del mundo a vista del jugador)
+        view_x = dx * cos_a - dy * sin_a
+        view_y = dx * sin_a + dy * cos_a
+
         return view_x, view_y
+
+
 
     def _project_point(self, x, y):
         if y <= 0.1:
@@ -103,50 +122,47 @@ class Game:
             pygame.draw.line(self.screen, self.line_color, (x, self.height), (center_x, horizon_y), 1)
 
     def draw_mountains(self):
-        for base_left, peak, base_right, visual_height in self.mountains:
-            # Transformar al espacio del jugador
-            p1 = self._world_to_player_view(*base_left)
-            p2 = self._world_to_player_view(*peak)
-            p3 = self._world_to_player_view(*base_right)
+        for base_left, peak, base_right, height in self.mountains:
+            # Convertir las coordenadas de cada vértice a cámara
+            bl_x, bl_y = self._world_to_player_view(*base_left)
+            pk_x, pk_y = self._world_to_player_view(*peak)
+            br_x, br_y = self._world_to_player_view(*base_right)
 
-            # Proyectar base izquierda y derecha
-            s1 = self._project_point(*p1)
-            s3 = self._project_point(*p3)
+            # Solo dibujar si están delante del jugador
+            if bl_y > 0 and pk_y > 0 and br_y > 0:
+                # Escalar altura en función de la profundidad (pk_y)
+                scale_factor = 200 / pk_y
+                bl_screen = (self.center_x + bl_x * scale_factor,
+                            self.horizon_line + bl_y * 0)  # ajustar Y según horizonte
+                pk_screen = (self.center_x + pk_x * scale_factor,
+                            bl_screen[1] - height * scale_factor)
+                br_screen = (self.center_x + br_x * scale_factor,
+                            bl_screen[1])
 
-            # Proyectar el pico con su altura visual
-            # ↓↓↓ Aquí está la clave: restamos altura proporcional a la profundidad
-            peak_proj = self._project_point(p2[0], p2[1])
-            if peak_proj:
-                screen_peak_x, screen_peak_y = peak_proj
-                screen_peak_y -= int(visual_height * (300 / p2[1]))  # altura en perspectiva
-                s2 = (screen_peak_x, screen_peak_y)
-            else:
-                s2 = None
-
-            # Dibujar si todo está dentro de la pantalla
-            if s1 and s2 and s3:
-                #pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3], 1) # El uno del final indica el grosor del contorno, si no tiene, es solido
-                pygame.draw.polygon(self.screen, self.line_color, [s1, s2, s3]) # Sin grosor para ser solido
-
+                pygame.draw.polygon(self.screen, self.line_color, [bl_screen, pk_screen, br_screen])
 
     def update(self):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            self.angle += self.turn_speed
-            if self.debug: print(f"Turning left: {self.angle} degrees")
-        if keys[pygame.K_d]:
             self.angle -= self.turn_speed
-            if self.debug: print(f"Turning left: {self.angle} degrees")
+            if self.debug:
+                print(f"Turning left: {self.angle} degrees")
+        if keys[pygame.K_d]:
+            self.angle += self.turn_speed
+            if self.debug:
+                print(f"Turning right: {self.angle} degrees")
         if keys[pygame.K_w]:
             rad = math.radians(self.angle)
             self.pos[0] += math.sin(rad) * self.speed
             self.pos[1] += math.cos(rad) * self.speed
-            if self.debug: print(f"Moving forward: {self.pos[0]}, {self.pos[1]}")
+            if self.debug:
+                print(f"Moving forward: {self.pos}")
         if keys[pygame.K_s]:
             rad = math.radians(self.angle)
             self.pos[0] -= math.sin(rad) * self.speed
             self.pos[1] -= math.cos(rad) * self.speed
-            if self.debug: print(f"Moving backward: {self.pos[0]}, {self.pos[1]}")
+            if self.debug:
+                print(f"Moving backward: {self.pos}")   
 
 
     def run(self):
